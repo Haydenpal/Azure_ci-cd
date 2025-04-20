@@ -1,17 +1,22 @@
-# HTML
 # Archive your static HTML project and save it with the build record.
 # Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
 
 trigger:
-- main
+- main  # Trigger on changes to the 'main' branch
 
 pool:
-  vmImage: ubuntu-latest
+  name: 'Azure Pipelines'  # Using the default Azure Pipelines pool, no need for hosted parallelism
 
 steps:
-- task: ArchiveFiles@2
+- task: ArchiveFiles@2  # Archive your HTML files
   inputs:
-    rootFolderOrFile: '$(build.sourcesDirectory)'
-    includeRootFolder: false
-- task: PublishBuildArtifacts@1
+    rootFolderOrFile: '$(Build.SourcesDirectory)'  # Path to the source folder containing index.html
+    includeRootFolder: false  # Do not include the root folder itself in the archive
+    archiveType: 'zip'  # Archive type (optional, you can choose tar or zip)
+    archiveFile: '$(Build.ArtifactStagingDirectory)/html-artifact.zip'  # Output artifact file location
+
+- task: PublishBuildArtifacts@1  # Publish the build artifact
+  inputs:
+    artifactName: 'html-artifact'  # Name of the artifact to be published
+    publishLocation: 'Container'  # The location where the artifact will be published (container)
+    targetPath: '$(Build.ArtifactStagingDirectory)'  # Directory to publish artifacts from
