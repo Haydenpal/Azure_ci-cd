@@ -2,7 +2,7 @@ trigger:
   - main  # Replace with your default branch if different
 
 pool:
-  name: Testing  # Replace with your agent pool name if different
+  name: Default  # Replace with your agent pool name if different
 
 steps:
   - task: CopyFiles@2
