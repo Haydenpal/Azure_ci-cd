@@ -1,0 +1,18 @@
+trigger:
+  - main  # Replace with your default branch if different
+
+pool:
+  name: Testing  # Replace with your agent pool name if different
+
+steps:
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)'
+      Contents: '**/*.html'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'html-files'
+      publishLocation: 'Container'
