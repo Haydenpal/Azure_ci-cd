@@ -1,18 +1,69 @@
 trigger:
-  - main  # Replace with your default branch if different
+  - main
 
 pool:
-  name: Default  # Replace with your agent pool name if different
+  name: Default  # Your self-hosted agent pool (on Ubuntu EC2)
+
+variables:
+  html_filename: 'index.html'
+  nginx_web_root: '/var/www/html/demo-site'
+  nginx_config_path: '/etc/nginx/sites-available/demo-site'
+  nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
+  docker_image: 'hello-world'  # Change this to any Docker Hub image
 
 steps:
+  # Step 1: Copy index.html to a staging directory
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.SourcesDirectory)'
       Contents: '**/*.html'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    displayName: 'Copy HTML Files'
 
-  - task: PublishBuildArtifacts@1
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      ArtifactName: 'html-files'
-      publishLocation: 'Container'
+  # Step 2: Move HTML to NGINX root directory
+  - script: |
+      echo "Setting up web root..."
+      sudo mkdir -p $(nginx_web_root)
+      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
+    displayName: 'Move HTML to /var/www/html/demo-site'
+
+  # Step 3: Deploy NGINX site configuration
+  - script: |
+      echo "Creating NGINX config..."
+      cat <<EOF | sudo tee $(nginx_config_path)
+server {
+    listen 80;
+    server_name _;
+
+    root $(nginx_web_root);
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+}
+EOF
+    displayName: 'Write NGINX Config File'
+
+  # Step 4: Enable site and reload NGINX
+  - script: |
+      echo "Linking and restarting NGINX..."
+      sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
+      sudo nginx -t && sudo systemctl reload nginx
+    displayName: 'Enable Site and Reload NGINX'
+
+  # Step 5: Pull and run Docker image from Docker Hub
+  - script: |
+      echo "Pulling and running Docker image: $(docker_image)"
+      sudo docker pull $(docker_image)
+
+      # Optional: Run the container if it's not hello-world
+      if [ "$(docker_image)" != "hello-world" ]; then
+        sudo docker stop demo-container || true
+        sudo docker rm demo-container || true
+        sudo docker run -d --name demo-container $(docker_image)
+      else
+        sudo docker run --rm $(docker_image)
+      fi
+    displayName: 'Pull and Run Docker Image'
+
