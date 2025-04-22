@@ -52,16 +52,24 @@ steps:
 
   # Step 5: Pull and run Docker image from Docker Hub
   - script: |
-      echo "Pulling and running Docker image: $docker_image"
+      echo "Docker image to pull: $docker_image"
+      
+      # Ensure the docker_image variable is set correctly
+      if [ -z "$docker_image" ]; then
+        echo "ERROR: docker_image is not set."
+        exit 1
+      fi
+
+      echo "Pulling Docker image: $docker_image"
       sudo docker pull $docker_image
 
       if [ "$docker_image" != "hello-world" ]; then
         echo "Running Docker container..."
         sudo docker stop demo-container || true
         sudo docker rm demo-container || true
-        sudo docker run -d --name demo-container $docker_image
+        sudo docker run -d --name demo-container $docker_image || { echo 'Docker run failed'; exit 1; }
       else
         echo "Running hello-world container (one-shot)..."
-        sudo docker run --rm $docker_image
+        sudo docker run --rm $docker_image || { echo 'Docker run failed'; exit 1; }
       fi
     displayName: 'Pull and Run Docker Image'
