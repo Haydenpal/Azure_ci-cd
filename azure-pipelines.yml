@@ -1,5 +1,5 @@
 trigger:
-  - main
+  - main  # Trigger on the main branch, change to your default branch if needed
 
 pool:
   name: Default  # Your self-hosted agent pool (on Ubuntu EC2)
@@ -9,7 +9,7 @@ variables:
   nginx_web_root: '/var/www/html/demo-site'
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
-  docker_image: 'hello-world'  # Change this to any Docker Hub image
+  docker_image: 'hello-world'  # Replace with any Docker image from Docker Hub
 
 steps:
   # Step 1: Copy index.html to a staging directory
@@ -30,19 +30,17 @@ steps:
   # Step 3: Deploy NGINX site configuration
   - script: |
       echo "Creating NGINX config..."
-      cat <<EOF | sudo tee $(nginx_config_path)
-server {
-    listen 80;
-    server_name _;
+      echo "server {
+        listen 80;
+        server_name _;
 
-    root $(nginx_web_root);
-    index index.html;
+        root $(nginx_web_root);
+        index index.html;
 
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-}
-EOF
+        location / {
+            try_files \$uri \$uri/ =404;
+        }
+      }" | sudo tee $(nginx_config_path) > /dev/null
     displayName: 'Write NGINX Config File'
 
   # Step 4: Enable site and reload NGINX
@@ -54,16 +52,16 @@ EOF
 
   # Step 5: Pull and run Docker image from Docker Hub
   - script: |
-      echo "Pulling and running Docker image: $(docker_image)"
-      sudo docker pull $(docker_image)
+      echo "Pulling and running Docker image: $docker_image"
+      sudo docker pull $docker_image
 
-      # Optional: Run the container if it's not hello-world
-      if [ "$(docker_image)" != "hello-world" ]; then
+      if [ "$docker_image" != "hello-world" ]; then
+        echo "Running Docker container..."
         sudo docker stop demo-container || true
         sudo docker rm demo-container || true
-        sudo docker run -d --name demo-container $(docker_image)
+        sudo docker run -d --name demo-container $docker_image
       else
-        sudo docker run --rm $(docker_image)
+        echo "Running hello-world container (one-shot)..."
+        sudo docker run --rm $docker_image
       fi
     displayName: 'Pull and Run Docker Image'
-
