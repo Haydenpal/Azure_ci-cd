@@ -9,7 +9,6 @@ variables:
   nginx_web_root: '/var/www/html/demo-site'
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
-  docker_image: 'hello-world'  # Replace with any Docker image from Docker Hub
 
 steps:
   # Step 1: Copy index.html to a staging directory
@@ -24,7 +23,7 @@ steps:
   - script: |
       echo "Setting up web root..."
       sudo mkdir -p $(nginx_web_root)
-      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
+      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/ 
     displayName: 'Move HTML to /var/www/html/demo-site'
 
   # Step 3: Deploy NGINX site configuration
@@ -50,26 +49,13 @@ steps:
       sudo nginx -t && sudo systemctl reload nginx
     displayName: 'Enable Site and Reload NGINX'
 
-  # Step 5: Pull and run Docker image from Docker Hub
+  # Step 5: Pull and run Docker image from Docker Hub (hardcoded hello-world image)
   - script: |
-      echo "Docker image to pull: $docker_image"
-      
-      # Ensure the docker_image variable is set correctly
-      if [ -z "$docker_image" ]; then
-        echo "ERROR: docker_image is not set."
-        exit 1
-      fi
+      echo "Pulling Docker image: hello-world"
+      sudo docker pull hello-world
 
-      echo "Pulling Docker image: $docker_image"
-      sudo docker pull $docker_image
-
-      if [ "$docker_image" != "hello-world" ]; then
-        echo "Running Docker container..."
-        sudo docker stop demo-container || true
-        sudo docker rm demo-container || true
-        sudo docker run -d --name demo-container $docker_image || { echo 'Docker run failed'; exit 1; }
-      else
-        echo "Running hello-world container (one-shot)..."
-        sudo docker run --rm $docker_image || { echo 'Docker run failed'; exit 1; }
-      fi
+      echo "Running hello-world Docker container..."
+      sudo docker stop demo-container || true
+      sudo docker rm demo-container || true
+      sudo docker run --rm hello-world || { echo 'Docker run failed'; exit 1; }
     displayName: 'Pull and Run Docker Image'
