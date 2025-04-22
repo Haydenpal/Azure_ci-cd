@@ -23,7 +23,7 @@ steps:
   - script: |
       echo "Setting up web root..."
       sudo mkdir -p $(nginx_web_root)
-      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/ 
+      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
     displayName: 'Move HTML to /var/www/html/demo-site'
 
   # Step 3: Deploy NGINX site configuration
@@ -49,13 +49,11 @@ steps:
       sudo nginx -t && sudo systemctl reload nginx
     displayName: 'Enable Site and Reload NGINX'
 
-  # Step 5: Pull and run Docker image from Docker Hub (hardcoded hello-world image)
+  # Step 5: Pull and run Docker image from Docker Hub (hardcoded hello-world image, no --rm)
   - script: |
       echo "Pulling Docker image: hello-world"
       sudo docker pull hello-world
 
       echo "Running hello-world Docker container..."
-      sudo docker stop demo-container || true
-      sudo docker rm demo-container || true
-      sudo docker run --rm hello-world || { echo 'Docker run failed'; exit 1; }
+      sudo docker run -d hello-world || { echo 'Docker run failed'; exit 1; }
     displayName: 'Pull and Run Docker Image'
