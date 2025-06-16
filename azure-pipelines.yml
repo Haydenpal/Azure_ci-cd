@@ -1,0 +1,68 @@
+trigger:
+  branches:
+    include:
+      - dev
+      - demo
+      - prod  # Trigger on these branches
+
+pool:
+  name: Default  # Use your correct self-hosted agent pool
+
+variables:
+  html_filename: 'index.html'
+  nginx_web_root: '/var/www/html/demo-site'
+  nginx_config_path: '/etc/nginx/sites-available/demo-site'
+  nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
+
+steps:
+  # Step 1: Identify the source branch
+  - script: |
+      echo "🔁 Triggered from branch: $(Build.SourceBranchName)"
+    displayName: 'Print Source Branch'
+
+  # Step 2: Copy index.html from the current branch (Azure DevOps auto-checks out the correct branch)
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)'
+      Contents: '**/index.html'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    displayName: 'Copy index.html from current branch'
+
+  # Step 3: Move HTML to NGINX root directory
+  - script: |
+      echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+      sudo mkdir -p $(nginx_web_root)
+      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
+    displayName: 'Move HTML to NGINX root'
+
+  # Step 4: Create NGINX site configuration
+  - script: |
+      echo "⚙️ Creating NGINX site config..."
+      echo "server {
+        listen 80;
+        server_name _;
+
+        root $(nginx_web_root);
+        index index.html;
+
+        location / {
+            try_files \$uri \$uri/ =404;
+        }
+      }" | sudo tee $(nginx_config_path) > /dev/null
+    displayName: 'Write NGINX Config File'
+
+  # Step 5: Enable and reload NGINX
+  - script: |
+      echo "🔄 Linking and restarting NGINX..."
+      sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
+      sudo nginx -t && sudo systemctl reload nginx
+    displayName: 'Reload NGINX'
+
+  # Step 6: Pull and run Docker image
+  - script: |
+      echo "🐳 Pulling Docker image: hello-world"
+      sudo docker pull hello-world
+
+      echo "🚀 Running Docker container"
+      sudo docker run -d hello-world || { echo 'Docker run failed'; exit 1; }
+    displayName: 'Pull and Run Docker Image'
