@@ -1,5 +1,5 @@
 trigger:
-  - main  # Trigger on the main branch, change to your default branch if needed
+  - demo  # Trigger on the main branch, change to your default branch if needed
 
 pool:
   name: Default  # Your self-hosted agent pool (on Ubuntu EC2)
