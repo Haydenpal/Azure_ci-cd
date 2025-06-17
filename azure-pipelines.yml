@@ -60,11 +60,4 @@ steps:
       sudo nginx -t && sudo systemctl reload nginx
     displayName: 'Reload NGINX'
 
-  # Step 6: Pull and run Docker image
-  - script: |
-      echo "🐳 Pulling Docker image: hello-world"
-      sudo docker pull hello-world
 
-      echo "🚀 Running Docker container"
-      sudo docker run -d hello-world || { echo 'Docker run failed'; exit 1; }
-    displayName: 'Pull and Run Docker Image'
