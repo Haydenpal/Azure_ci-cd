@@ -5,14 +5,16 @@ trigger:
       - demo
       - prod  # Trigger on these branches
 
-pool:
-  name: Default  # Use your correct self-hosted agent pool
-
 variables:
   html_filename: 'index.html'
   nginx_web_root: '/var/www/html/demo-site'
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
+
+pool:
+  name: 'Default'  # This is your shared pool with all 3 agents
+  demands:
+    - branch -equals $(Build.SourceBranchName)
 
 steps:
   # Step 1: Identify the source branch
@@ -20,7 +22,7 @@ steps:
       echo "🔁 Triggered from branch: $(Build.SourceBranchName)"
     displayName: 'Print Source Branch'
 
-  # Step 2: Copy index.html from the current branch (Azure DevOps auto-checks out the correct branch)
+  # Step 2: Copy index.html from the current branch
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.SourcesDirectory)'
@@ -58,3 +60,11 @@ steps:
       sudo nginx -t && sudo systemctl reload nginx
     displayName: 'Reload NGINX'
 
+  # Step 6: Pull and run Docker image
+  - script: |
+      echo "🐳 Pulling Docker image: hello-world"
+      sudo docker pull hello-world
+
+      echo "🚀 Running Docker container"
+      sudo docker run -d hello-world || { echo 'Docker run failed'; exit 1; }
+    displayName: 'Pull and Run Docker Image'
