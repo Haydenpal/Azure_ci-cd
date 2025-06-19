@@ -1,13 +1,13 @@
 trigger:
   branches:
     include:
-      - dev  # Trigger on push to dev 
+      - dev  # Only trigger on push to dev
 
 pr:
   branches:
     include:
       - demo
-      - prod  # Trigger PRs targeting demo or prod
+      - prod  # Only trigger PRs targeting demo or prod
 
 variables:
   html_filename: 'index.html'
@@ -15,105 +15,104 @@ variables:
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
-  sourceBranchOnly: $[replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'refs/pull/', '')]
-  isFeaturePR: $[and(eq(variables['Build.Reason'], 'PullRequest'), startsWith(variables['sourceBranchOnly'], 'feature/'))]
+  # Extract branch name from source ref (for push or PR)
+  sourceBranchName: $[replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'refs/pull/', '')]
 
+  # Is this a PR from a feature/* branch?
+  isFeaturePR: $[and(eq(variables['Build.Reason'], 'PullRequest'), startsWith(variables['sourceBranchName'], 'feature/'))]
 
 jobs:
-# 🧩 Job with branch demand (used for dev, demo, prod branches)
+
+# ✅ Job for dev/demo/prod — with agent demand
 - job: DeployWithDemands
-  displayName: 'Deploy with branch-specific agent'
-  condition: ne(variables['isFeaturePR'], 'true')  # Skip this if it's a feature PR
+  displayName: 'Deploy with Branch Demands'
+  condition: ne(variables['isFeaturePR'], 'true')  # Skip if it's a feature PR
   pool:
     name: 'Default'
     demands:
-      - branch -equals $(normalizedBranch)
+      - branch -equals $(sourceBranchName)
 
   steps:
     - script: |
-        echo "🔁 Source Branch: $(Build.SourceBranch)"
-        echo "🔧 Normalized Branch: $(normalizedBranch)"
-        echo "📦 isFeaturePR: $(isFeaturePR)"
-      displayName: 'Show Branch Info'
+        echo "🌿 Branch: $(Build.SourceBranch)"
+        echo "🔍 Normalized: $(sourceBranchName)"
+        echo "🚀 Feature PR? $(isFeaturePR)"
+      displayName: 'Log Info'
 
     - task: CopyFiles@2
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: '**/index.html'
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
-      displayName: 'Copy index.html from current branch'
+      displayName: 'Copy index.html'
 
     - script: |
-        echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+        echo "Deploying to $(nginx_web_root)"
         sudo mkdir -p $(nginx_web_root)
         sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-      displayName: 'Move HTML to NGINX root'
+      displayName: 'Move HTML to NGINX'
 
     - script: |
-        echo "⚙️ Creating NGINX site config..."
+        echo "Generating NGINX config"
         echo "server {
           listen 80;
           server_name _;
-
           root $(nginx_web_root);
           index index.html;
-
           location / {
               try_files \$uri \$uri/ =404;
           }
         }" | sudo tee $(nginx_config_path) > /dev/null
-      displayName: 'Write NGINX Config File'
+      displayName: 'Write NGINX Config'
 
     - script: |
-        echo "🔄 Linking and restarting NGINX..."
+        echo "Reloading NGINX..."
         sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
         sudo nginx -t && sudo systemctl reload nginx
-      displayName: 'Reload NGINX'
+      displayName: 'Restart NGINX'
 
-# 🚫 Job without branch demand (used for feature/* PRs only)
+# ✅ Job for feature/* PRs — no branch demand
 - job: DeployWithoutDemands
-  displayName: 'Deploy without agent demand (feature PR)'
-  condition: eq(variables['isFeaturePR'], 'true')
+  displayName: 'Deploy without Branch Demands (Feature PR)'
+  condition: eq(variables['isFeaturePR'], 'true')  # Only run for PRs from feature/*
   pool:
     name: 'Default'
 
   steps:
     - script: |
-        echo "🔁 Source Branch: $(Build.SourceBranch)"
-        echo "🔧 Normalized Branch: $(normalizedBranch)"
-        echo "📦 isFeaturePR: $(isFeaturePR)"
-      displayName: 'Show Branch Info'
+        echo "🌿 Branch: $(Build.SourceBranch)"
+        echo "🔍 Normalized: $(sourceBranchName)"
+        echo "🚀 Feature PR? $(isFeaturePR)"
+      displayName: 'Log Info'
 
     - task: CopyFiles@2
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: '**/index.html'
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
-      displayName: 'Copy index.html from current branch'
+      displayName: 'Copy index.html'
 
     - script: |
-        echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+        echo "Deploying to $(nginx_web_root)"
         sudo mkdir -p $(nginx_web_root)
         sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-      displayName: 'Move HTML to NGINX root'
+      displayName: 'Move HTML to NGINX'
 
     - script: |
-        echo "⚙️ Creating NGINX site config..."
+        echo "Generating NGINX config"
         echo "server {
           listen 80;
           server_name _;
-
           root $(nginx_web_root);
           index index.html;
-
           location / {
               try_files \$uri \$uri/ =404;
           }
         }" | sudo tee $(nginx_config_path) > /dev/null
-      displayName: 'Write NGINX Config File'
+      displayName: 'Write NGINX Config'
 
     - script: |
-        echo "🔄 Linking and restarting NGINX..."
+        echo "Reloading NGINX..."
         sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
         sudo nginx -t && sudo systemctl reload nginx
-      displayName: 'Reload NGINX'
+      displayName: 'Restart NGINX'
