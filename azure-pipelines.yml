@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - dev  # Trigger on push to dev only
+      - dev  # Trigger on push to dev 
 
 pr:
   branches:
