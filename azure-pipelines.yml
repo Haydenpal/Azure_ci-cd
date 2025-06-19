@@ -1,13 +1,13 @@
 trigger:
   branches:
     include:
-      - dev # Testing
+      - dev  # Only push to 'dev' triggers pipeline
 
 pr:
   branches:
     include:
       - demo
-      - prod
+      - prod  # PRs targeting 'demo' or 'prod' trigger pipeline
 
 variables:
   html_filename: 'index.html'
@@ -15,90 +15,46 @@ variables:
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
-  # Normalize branch name (remove refs/heads/ and refs/pull/)
-  normalizedBranch: $[replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'refs/pull/', '')]
+pool:
+  name: 'Default'
+  demands:
+    - branch -equals $(Build.SourceBranchName)
 
-jobs:
-  - job: WithDemand
-    displayName: 'Run with branch demand'
-    condition: ne(variables['normalizedBranch'], 'feature/demo-test')
-    pool:
-      name: 'Default'
-      demands:
-        - branch -equals $(normalizedBranch)
-    steps:
-      - script: echo "Running with demand for branch $(normalizedBranch)"
-      - task: CopyFiles@2
-        inputs:
-          SourceFolder: '$(Build.SourcesDirectory)'
-          Contents: '**/index.html'
-          TargetFolder: '$(Build.ArtifactStagingDirectory)'
-        displayName: 'Copy index.html from current branch'
+steps:
+  - script: |
+      echo "🔁 Triggered from branch: $(Build.SourceBranchName)"
+    displayName: 'Print Source Branch'
 
-      - script: |
-          echo "Setting up NGINX web root at $(nginx_web_root)..."
-          sudo mkdir -p $(nginx_web_root)
-          sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-        displayName: 'Move HTML to NGINX root'
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)'
+      Contents: '**/index.html'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    displayName: 'Copy index.html from current branch'
 
-      - script: |
-          echo "Creating NGINX site config..."
-          echo "server {
-            listen 80;
-            server_name _;
+  - script: |
+      echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+      sudo mkdir -p $(nginx_web_root)
+      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
+    displayName: 'Move HTML to NGINX root'
 
-            root $(nginx_web_root);
-            index index.html;
+  - script: |
+      echo "⚙️ Creating NGINX site config..."
+      echo "server {
+        listen 80;
+        server_name _;
 
-            location / {
-                try_files \$uri \$uri/ =404;
-            }
-          }" | sudo tee $(nginx_config_path) > /dev/null
-        displayName: 'Write NGINX Config File'
+        root $(nginx_web_root);
+        index index.html;
 
-      - script: |
-          echo "Linking and restarting NGINX..."
-          sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
-          sudo nginx -t && sudo systemctl reload nginx
-        displayName: 'Reload NGINX'
+        location / {
+            try_files \$uri \$uri/ =404;
+        }
+      }" | sudo tee $(nginx_config_path) > /dev/null
+    displayName: 'Write NGINX Config File'
 
-  - job: WithoutDemand
-    displayName: 'Run without branch demand (feature/demo-test)'
-    condition: eq(variables['normalizedBranch'], 'feature/demo-test')
-    pool:
-      name: 'Default'
-    steps:
-      - script: echo "Running WITHOUT demand for branch $(normalizedBranch)"
-      - task: CopyFiles@2
-        inputs:
-          SourceFolder: '$(Build.SourcesDirectory)'
-          Contents: '**/index.html'
-          TargetFolder: '$(Build.ArtifactStagingDirectory)'
-        displayName: 'Copy index.html from current branch'
-
-      - script: |
-          echo "Setting up NGINX web root at $(nginx_web_root)..."
-          sudo mkdir -p $(nginx_web_root)
-          sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-        displayName: 'Move HTML to NGINX root'
-
-      - script: |
-          echo "Creating NGINX site config..."
-          echo "server {
-            listen 80;
-            server_name _;
-
-            root $(nginx_web_root);
-            index index.html;
-
-            location / {
-                try_files \$uri \$uri/ =404;
-            }
-          }" | sudo tee $(nginx_config_path) > /dev/null
-        displayName: 'Write NGINX Config File'
-
-      - script: |
-          echo "Linking and restarting NGINX..."
-          sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
-          sudo nginx -t && sudo systemctl reload nginx
-        displayName: 'Reload NGINX'
+  - script: |
+      echo "🔄 Linking and restarting NGINX..."
+      sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
+      sudo nginx -t && sudo systemctl reload nginx
+    displayName: 'Reload NGINX'
