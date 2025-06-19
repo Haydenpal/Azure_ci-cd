@@ -1,9 +1,13 @@
 trigger:
   branches:
     include:
-      - dev
+      - dev  # Only push to 'dev' triggers pipeline
+
+pr:
+  branches:
+    include:
       - demo
-      - prod  # Trigger on these branches
+      - prod  # PRs targeting 'demo' or 'prod' trigger pipeline
 
 variables:
   html_filename: 'index.html'
@@ -12,17 +16,15 @@ variables:
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
 pool:
-  name: 'Default'  # This is your shared pool with all 3 agents
+  name: 'Default'
   demands:
     - branch -equals $(Build.SourceBranchName)
 
 steps:
-  # Step 1: Identify the source branch
   - script: |
       echo "🔁 Triggered from branch: $(Build.SourceBranchName)"
     displayName: 'Print Source Branch'
 
-  # Step 2: Copy index.html from the current branch
   - task: CopyFiles@2
     inputs:
       SourceFolder: '$(Build.SourcesDirectory)'
@@ -30,14 +32,12 @@ steps:
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
     displayName: 'Copy index.html from current branch'
 
-  # Step 3: Move HTML to NGINX root directory
   - script: |
       echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
       sudo mkdir -p $(nginx_web_root)
       sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
     displayName: 'Move HTML to NGINX root'
 
-  # Step 4: Create NGINX site configuration
   - script: |
       echo "⚙️ Creating NGINX site config..."
       echo "server {
@@ -53,7 +53,6 @@ steps:
       }" | sudo tee $(nginx_config_path) > /dev/null
     displayName: 'Write NGINX Config File'
 
-  # Step 5: Enable and reload NGINX
   - script: |
       echo "🔄 Linking and restarting NGINX..."
       sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
