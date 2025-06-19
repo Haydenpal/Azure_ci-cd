@@ -15,8 +15,7 @@ variables:
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
-# Choose demand key and value depending on build reason
-variables:
+  # Define demand_key and demand_value based on build reason
   demand_key: $[eq(variables['Build.Reason'], 'PullRequest') ? 'branch_merge' : 'branch']
   demand_value: $[eq(variables['Build.Reason'], 'PullRequest') ? 'merge' : variables['Build.SourceBranchName']]
 
