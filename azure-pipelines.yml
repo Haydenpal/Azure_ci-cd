@@ -21,7 +21,7 @@ variables:
   # Check if this is a PR and from feature/ branch
   isFeaturePR: $[and(eq(variables['Build.Reason'], 'PullRequest'), startsWith(variables['normalizedBranch'], 'feature/'))]
 
-# Use conditional logic for pool demands
+# ✅ Conditional demands (only apply to non-feature PRs)
 pool:
   name: 'Default'
   ${{ if ne(variables['isFeaturePR'], 'true') }}:
