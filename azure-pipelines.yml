@@ -16,33 +16,35 @@ variables:
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
 jobs:
-- job: PR_Build
-  displayName: 'Pull Request (merge) Build'
-  condition: eq(variables['Build.Reason'], 'PullRequest')
+- job: PR_Demo
+  displayName: 'PR to Demo'
+  condition: and(eq(variables['Build.Reason'], 'PullRequest'), contains(variables['System.PullRequest.TargetBranch'], 'demo'))
   pool:
     name: 'Default'
     demands:
-      - branch_merge -equals merge
+      - branch_demo_merge -equals merge
   steps:
     - script: |
-        echo "🔁 PR triggered from branch: $(Build.SourceBranchName)"
-      displayName: 'Print Source Branch'
+        echo "🔁 PR triggered for target: demo"
+        echo "Build.Reason: $(Build.Reason)"
+        echo "Target Branch: $(System.PullRequest.TargetBranch)"
+      displayName: 'Print PR Info (Demo)'
 
     - task: CopyFiles@2
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: '**/index.html'
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
-      displayName: 'Copy index.html from current branch'
+      displayName: 'Copy index.html'
 
     - script: |
-        echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+        echo "📁 Setting up NGINX..."
         sudo mkdir -p $(nginx_web_root)
         sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-      displayName: 'Move HTML to NGINX root'
+      displayName: 'Deploy to NGINX'
 
     - script: |
-        echo "⚙️ Creating NGINX site config..."
+        echo "⚙️ Creating NGINX config..."
         echo "server {
           listen 80;
           server_name _;
@@ -54,10 +56,58 @@ jobs:
               try_files \$uri \$uri/ =404;
           }
         }" | sudo tee $(nginx_config_path) > /dev/null
-      displayName: 'Write NGINX Config File'
+      displayName: 'Write NGINX Config'
 
     - script: |
-        echo "🔄 Linking and restarting NGINX..."
+        echo "🔄 Reloading NGINX..."
+        sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
+        sudo nginx -t && sudo systemctl reload nginx
+      displayName: 'Reload NGINX'
+
+- job: PR_Prod
+  displayName: 'PR to Prod'
+  condition: and(eq(variables['Build.Reason'], 'PullRequest'), contains(variables['System.PullRequest.TargetBranch'], 'prod'))
+  pool:
+    name: 'Default'
+    demands:
+      - branch_prod_merge -equals merge
+  steps:
+    - script: |
+        echo "🔁 PR triggered for target: prod"
+        echo "Build.Reason: $(Build.Reason)"
+        echo "Target Branch: $(System.PullRequest.TargetBranch)"
+      displayName: 'Print PR Info (Prod)'
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)'
+        Contents: '**/index.html'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      displayName: 'Copy index.html'
+
+    - script: |
+        echo "📁 Setting up NGINX..."
+        sudo mkdir -p $(nginx_web_root)
+        sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
+      displayName: 'Deploy to NGINX'
+
+    - script: |
+        echo "⚙️ Creating NGINX config..."
+        echo "server {
+          listen 80;
+          server_name _;
+
+          root $(nginx_web_root);
+          index index.html;
+
+          location / {
+              try_files \$uri \$uri/ =404;
+          }
+        }" | sudo tee $(nginx_config_path) > /dev/null
+      displayName: 'Write NGINX Config'
+
+    - script: |
+        echo "🔄 Reloading NGINX..."
         sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
         sudo nginx -t && sudo systemctl reload nginx
       displayName: 'Reload NGINX'
@@ -71,24 +121,24 @@ jobs:
       - branch -equals $(Build.SourceBranchName)
   steps:
     - script: |
-        echo "🔁 Branch triggered: $(Build.SourceBranchName)"
-      displayName: 'Print Source Branch'
+        echo "🔁 Branch Build: $(Build.SourceBranchName)"
+      displayName: 'Print Branch Name'
 
     - task: CopyFiles@2
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: '**/index.html'
         TargetFolder: '$(Build.ArtifactStagingDirectory)'
-      displayName: 'Copy index.html from current branch'
+      displayName: 'Copy index.html'
 
     - script: |
-        echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+        echo "📁 Setting up NGINX..."
         sudo mkdir -p $(nginx_web_root)
         sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-      displayName: 'Move HTML to NGINX root'
+      displayName: 'Deploy to NGINX'
 
     - script: |
-        echo "⚙️ Creating NGINX site config..."
+        echo "⚙️ Creating NGINX config..."
         echo "server {
           listen 80;
           server_name _;
@@ -100,10 +150,10 @@ jobs:
               try_files \$uri \$uri/ =404;
           }
         }" | sudo tee $(nginx_config_path) > /dev/null
-      displayName: 'Write NGINX Config File'
+      displayName: 'Write NGINX Config'
 
     - script: |
-        echo "🔄 Linking and restarting NGINX..."
+        echo "🔄 Reloading NGINX..."
         sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
         sudo nginx -t && sudo systemctl reload nginx
       displayName: 'Reload NGINX'
