@@ -1,0 +1,60 @@
+trigger:
+  branches:
+    include:
+      - dev  # Only push to 'dev' triggers pipeline
+
+pr:
+  branches:
+    include:
+      - demo
+      - prod  # PRs targeting 'demo' or 'prod' trigger pipeline
+
+variables:
+  html_filename: 'index.html'
+  nginx_web_root: '/var/www/html/demo-site'
+  nginx_config_path: '/etc/nginx/sites-available/demo-site'
+  nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
+
+pool:
+  name: 'Default'
+  demands:
+    - branch -equals $(Build.SourceBranchName)
+
+steps:
+  - script: |
+      echo "🔁 Triggered from branch: $(Build.SourceBranchName)"
+    displayName: 'Print Source Branch'
+
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)'
+      Contents: '**/index.html'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    displayName: 'Copy index.html from current branch'
+
+  - script: |
+      echo "📁 Setting up NGINX web root at $(nginx_web_root)..."
+      sudo mkdir -p $(nginx_web_root)
+      sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
+    displayName: 'Move HTML to NGINX root'
+
+  - script: |
+      echo "⚙️ Creating NGINX site config..."
+      echo "server {
+        listen 80;
+        server_name _;
+
+        root $(nginx_web_root);
+        index index.html;
+
+        location / {
+            try_files \$uri \$uri/ =404;
+        }
+      }" | sudo tee $(nginx_config_path) > /dev/null
+    displayName: 'Write NGINX Config File'
+
+  - script: |
+      echo "🔄 Linking and restarting NGINX..."
+      sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
+      sudo nginx -t && sudo systemctl reload nginx
+    displayName: 'Reload NGINX'
