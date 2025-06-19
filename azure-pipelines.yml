@@ -15,11 +15,9 @@ variables:
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
-  # Normalize source branch name (e.g., refs/heads/dev → dev)
-  normalizedBranch: $[replace(variables['Build.SourceBranch'], 'refs/heads/', '')]
+  sourceBranchOnly: $[replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'refs/pull/', '')]
+  isFeaturePR: $[and(eq(variables['Build.Reason'], 'PullRequest'), startsWith(variables['sourceBranchOnly'], 'feature/'))]
 
-  # Check if this is a PR and from feature/ branch
-  isFeaturePR: $[and(eq(variables['Build.Reason'], 'PullRequest'), startsWith(variables['normalizedBranch'], 'feature/'))]
 
 jobs:
 # 🧩 Job with branch demand (used for dev, demo, prod branches)
