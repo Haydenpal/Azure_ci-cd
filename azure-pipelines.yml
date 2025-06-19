@@ -17,8 +17,7 @@ variables:
 
 pool:
   name: 'Default'
-  demands:
-    - branch -equals $(Build.SourceBranchName)
+  
 
 steps:
   - script: |
