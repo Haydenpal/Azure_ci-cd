@@ -1,13 +1,13 @@
 trigger:
   branches:
     include:
-      - dev  # Only push to 'dev' triggers pipeline
+      - dev  # Trigger on push to dev only
 
 pr:
   branches:
     include:
       - demo
-      - prod  # PRs targeting 'demo' or 'prod' trigger pipeline
+      - prod  # Trigger PRs targeting demo or prod
 
 variables:
   html_filename: 'index.html'
@@ -15,15 +15,25 @@ variables:
   nginx_config_path: '/etc/nginx/sites-available/demo-site'
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
+  # Normalize source branch name (e.g., refs/heads/dev → dev)
+  normalizedBranch: $[replace(variables['Build.SourceBranch'], 'refs/heads/', '')]
+
+  # Check if this is a PR and from feature/ branch
+  isFeaturePR: $[and(eq(variables['Build.Reason'], 'PullRequest'), startsWith(variables['normalizedBranch'], 'feature/'))]
+
+# ✅ Conditional demands (only apply to non-feature PRs)
 pool:
   name: 'Default'
-  demands:
-    - branch -equals $(Build.SourceBranchName)
+  ${{ if ne(variables['isFeaturePR'], 'true') }}:
+    demands:
+      - branch -equals $(normalizedBranch)
 
 steps:
   - script: |
-      echo "🔁 Triggered from branch: $(Build.SourceBranchName)"
-    displayName: 'Print Source Branch'
+      echo "🔁 Source Branch: $(Build.SourceBranch)"
+      echo "🔧 Normalized Branch: $(normalizedBranch)"
+      echo "📦 isFeaturePR: $(isFeaturePR)"
+    displayName: 'Show Branch Info'
 
   - task: CopyFiles@2
     inputs:
