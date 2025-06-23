@@ -6,7 +6,6 @@ trigger:
 pr:
   branches:
     include:
-      - dev
       - demo
       - prod
 
@@ -17,54 +16,6 @@ variables:
   nginx_symlink_path: '/etc/nginx/sites-enabled/demo-site'
 
 jobs:
-- job: PR_Dev
-  displayName: 'PR to Dev'
-  condition: and(eq(variables['Build.Reason'], 'PullRequest'), contains(variables['System.PullRequest.TargetBranch'], 'dev'))
-  pool:
-    name: 'Default'
-    demands:
-      - branch_dev_merge -equals merge
-  steps:
-    - script: |
-        echo "🔁 PR triggered for target: dev"
-        echo "Build.Reason: $(Build.Reason)"
-        echo "Target Branch: $(System.PullRequest.TargetBranch)"
-      displayName: 'Print PR Info (Dev)'
-
-    - task: CopyFiles@2
-      inputs:
-        SourceFolder: '$(Build.SourcesDirectory)'
-        Contents: '**/index.html'
-        TargetFolder: '$(Build.ArtifactStagingDirectory)'
-      displayName: 'Copy index.html'
-
-    - script: |
-        echo "📁 Setting up NGINX..."
-        sudo mkdir -p $(nginx_web_root)
-        sudo cp $(Build.ArtifactStagingDirectory)/$(html_filename) $(nginx_web_root)/
-      displayName: 'Deploy to NGINX'
-
-    - script: |
-        echo "⚙️ Creating NGINX config..."
-        echo "server {
-          listen 80;
-          server_name _;
-
-          root $(nginx_web_root);
-          index index.html;
-
-          location / {
-              try_files \$uri \$uri/ =404;
-          }
-        }" | sudo tee $(nginx_config_path) > /dev/null
-      displayName: 'Write NGINX Config'
-
-    - script: |
-        echo "🔄 Reloading NGINX..."
-        sudo ln -sf $(nginx_config_path) $(nginx_symlink_path)
-        sudo nginx -t && sudo systemctl reload nginx
-      displayName: 'Reload NGINX'
-
 - job: PR_Demo
   displayName: 'PR to Demo'
   condition: and(eq(variables['Build.Reason'], 'PullRequest'), contains(variables['System.PullRequest.TargetBranch'], 'demo'))
@@ -162,12 +113,12 @@ jobs:
       displayName: 'Reload NGINX'
 
 - job: Branch_Build
-  displayName: 'Branch Build (Push to dev)'
-  condition: and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.SourceBranchName'], 'dev'))
+  displayName: 'Branch Build (dev/demo/prod)'
+  condition: ne(variables['Build.Reason'], 'PullRequest')
   pool:
     name: 'Default'
     demands:
-      - branch -equals dev
+      - branch -equals $(Build.SourceBranchName)
   steps:
     - script: |
         echo "🔁 Branch Build: $(Build.SourceBranchName)"
